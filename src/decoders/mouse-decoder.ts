@@ -7,13 +7,19 @@ type DecoderEvent = {
     vector: SimpleVector;
     speed: SimpleVector;
   }];
-  smoothMoveToStop: [{
+  smoothMove: [{
     vector: SimpleVector;
   }];
   scale: [{
+    /**
+     * vector.y 表示滚轮滚动了 y 次(y > 0 表示向下滚, y < 0 表示向上滚)
+     */
     vector: SimpleVector;
   }];
   smoothScale: [{
+    /**
+     * vector.y 表示滚轮滚动了 y 次(y > 0 表示向下滚, y < 0 表示向上滚)
+     */
     vector: SimpleVector;
   }];
 }
@@ -30,13 +36,6 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   protected mouseMoveHistory = new MouseHistory()
 
   protected wheelHistory = new MouseHistory()
-
-  /**
-   * 必须大于 1
-   */
-  protected SCALE_RATIO = 1.1
-
-  protected SMOOTH_SCALE_RATIO = 0.02
 
   protected SMOOTH_MOVE_RATIO = 10
 
@@ -86,11 +85,11 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     window.cancelAnimationFrame(this.smoothScaleFlag)
     this.wheelHistory.pushFromWheelEvent(e)
     // this.emit("scale", {
-    //   vector: this.normalizeScaleVector(this.wheelHistory.getLastDelta()),
+    //   vector: this.wheelHistory.getLastDelta(),
     // })
     this.smoothScale(
       this.wheelHistory.getLastDelta(),
-      20,
+      10,
       Date.now() + this.SMOOTH_SCALE_DELTA_TIME,
     )
   }
@@ -119,9 +118,8 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
       y: speed.y * ((times - 1) / times),
       time: speed.time * (1 / times),
     }
-    this.emit("move", {
+    this.emit("smoothMove", {
       vector,
-      speed,
     })
     window.requestAnimationFrame(() => {
       this.smoothMove(nextSpeed, times - 1)
@@ -129,50 +127,26 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   }
 
   protected smoothScale = (speed: SimpleVector, times: number, stopTime?: number) => {
-    if (times <= 0 || (stopTime && Date.now() > stopTime)) {
-      return
+    const d: SimpleVector = {
+      x: (2 * speed.x) / times / (times - 1),
+      y: (2 * speed.y) / times / (times - 1),
+      time: speed.time / times,
     }
-    const vector: SimpleVector = {
-      x: speed.x * this.SMOOTH_SCALE_RATIO,
-      y: speed.y * this.SMOOTH_SCALE_RATIO,
-      time: 0,
+    const smoothScale = (i: number) => {
+      if (i < 0 || (stopTime && Date.now() > stopTime)) {
+        return
+      }
+      const vector = {
+        x: d.x * i,
+        y: d.y * i,
+        time: d.time,
+      }
+      this.emit("smoothScale", {
+        vector,
+      })
+      this.smoothScaleFlag = window.requestAnimationFrame(() => smoothScale(i - 1))
     }
-    const nextSpeed: SimpleVector = times <= 1 ? {
-      x: 0,
-      y: 0,
-      time: 0,
-    } : {
-      x: speed.x * ((times - 1) / times),
-      y: speed.y * ((times - 1) / times),
-      time: speed.time * (1 / times),
-    }
-    this.emit("smoothScale", {
-      vector: this.normalizeScaleVector(vector),
-    })
-    this.smoothScaleFlag = window.requestAnimationFrame(() => {
-      this.smoothScale(nextSpeed, times - 1)
-    })
-  }
-
-  protected scaleDeltaToScalar(delta: number) {
-    let scalar = Math.abs(delta)
-    if (scalar >= 1) {
-      scalar *= this.SCALE_RATIO
-    } else {
-      scalar += 1
-    }
-    if (delta > 0) {
-      scalar = 1 / scalar
-    }
-    return scalar
-  }
-
-  protected normalizeScaleVector(vector: SimpleVector) {
-    return {
-      x: this.scaleDeltaToScalar(vector.x),
-      y: this.scaleDeltaToScalar(vector.y),
-      time: vector.time,
-    }
+    smoothScale(times - 1)
   }
 
   constructor(elememt: HTMLElement, listen = true) {

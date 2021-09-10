@@ -18,30 +18,48 @@ function App() {
   const [scalar, setScalar] = useState(1)
   const onInit = useCallback((elem: HTMLDivElement | null) => {
     if (elem) {
-      setMouseDecoder(new MouseDecoder(elem))
+      setMouseDecoder(new MouseDecoder(elem, false))
     }
   }, [])
 
   useEffect(() => {
     if (mouseDecoder) {
+      mouseDecoder.subscribe()
       mouseDecoder.addListener("move", ({ vector }) => {
         setTranslate((prev) => ({
           x: prev.x + vector.x,
           y: prev.y + vector.y,
         }))
       })
-      mouseDecoder.addListener("smoothMoveToStop", ({ vector }) => {
+      mouseDecoder.addListener("smoothMove", ({ vector }) => {
         setTranslate((prev) => ({
           x: prev.x + vector.x,
           y: prev.y + vector.y,
         }))
       })
       mouseDecoder.addListener("scale", ({ vector }) => {
-        console.log(vector.y)
-        setScalar((prev) => prev * vector.y)
+        setScalar((prev) => {
+          const y = vector.y * -0.2
+          if (prev >= 1) {
+            return prev + y
+          }
+          if (y > 0) {
+            return prev + y
+          }
+          return prev * (1 + y)
+        })
       })
       mouseDecoder.addListener("smoothScale", ({ vector }) => {
-        setScalar((prev) => prev * vector.y)
+        setScalar((prev) => {
+          const y = vector.y * -0.3
+          if (prev >= 1) {
+            return prev + y
+          }
+          if (y > 0) {
+            return prev + y
+          }
+          return prev * (1 + y)
+        })
       })
       return () => {
         mouseDecoder.removeAllListeners()
