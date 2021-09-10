@@ -1,6 +1,6 @@
 /* eslint-disable class-methods-use-this */
-import { MouseHistory, SimpleVector } from "@Src/utils/mouse"
 import EventEmitter from "eventemitter3"
+import { MouseHistory, SimpleVector } from "@Src/utils/mouse"
 
 type DecoderEvent = {
   move: [{
