@@ -149,7 +149,6 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     this.emit("smoothScale", {
       vector: this.normalizeScaleVector(vector),
     })
-    console.log(this.normalizeScaleVector(vector).y)
     this.smoothScaleFlag = window.requestAnimationFrame(() => {
       this.smoothScale(nextSpeed, times - 1)
     })
