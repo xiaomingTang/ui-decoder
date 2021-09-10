@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "outDir": "./dist",
+    "sourceMap": true,
+    "declaration": true,
+    "module": "esnext",
+    "target": "esnext",
+    "jsx": "react",
+    "moduleResolution": "node",
+    "allowJs": true,
+    "strict": true,
+    "paths": {
+      "@Src/*": ["src/*"],
+      "@Examples/*": ["examples/*"],
+    }
+  },
+  "include": [
+    "./src/**/*",
+    "./examples/**/*"
+  ]
+}

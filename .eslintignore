@@ -1,0 +1,10 @@
+**/*.js
+**/*.jsx
+**/*.ts
+**/*.tsx
+!src/**/*.ts
+!src/**/*.tsx
+!examples/**/*.ts
+!examples/**/*.tsx
+**/*.d.ts
+**/*.js

@@ -1,0 +1,8 @@
+**/node_modules/
+**/.git/
+**/.DS_Store
+**/debug.log
+**/yarn-error.log
+/config/.env.local.ts
+
+/dist/
