@@ -19,6 +19,14 @@ const cjsWebpackConfig = merge(prodWebpackConfig, {
       type: 'umd',
     },
   },
+  externals: {
+    eventemitter3: {
+      commonjs: 'eventemitter3',
+      commonjs2: 'eventemitter3',
+      amd: 'eventemitter3',
+      root: 'EventEmitter3',
+    },
+  },
   plugins: [
     new CleanWebpackPlugin({
       verbose: true,

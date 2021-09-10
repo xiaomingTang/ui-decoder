@@ -3029,7 +3029,7 @@ etag@~1.8.1:
   resolved "https://registry.npmjs.org/etag/-/etag-1.8.1.tgz#41ae2eeb65efa62268aebfea83ac7d79299b0887"
   integrity sha1-Qa4u62XvpiJorr/qg6x9eSmbCIc=
 
-eventemitter3@^4.0.0:
+eventemitter3@^4.0.0, eventemitter3@^4.0.7:
   version "4.0.7"
   resolved "https://registry.npmjs.org/eventemitter3/-/eventemitter3-4.0.7.tgz#2de9b68f6528d5644ef5c59526a1b4a07306169f"
   integrity sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw==
@@ -6804,6 +6804,11 @@ ws@^8.1.0:
   version "8.2.2"
   resolved "https://registry.npmjs.org/ws/-/ws-8.2.2.tgz#ca684330c6dd6076a737250ed81ac1606cb0a63e"
   integrity sha512-Q6B6H2oc8QY3llc3cB8kVmQ6pnJWVQbP7Q5algTcIxx7YEpc0oU4NBVHlztA7Ekzfhw2r0rPducMUiCGWKQRzw==
+
+xiaoming-hooks@^0.1.2:
+  version "0.1.2"
+  resolved "https://registry.npmjs.org/xiaoming-hooks/-/xiaoming-hooks-0.1.2.tgz#2f11de50af0f320ac1c5fc8439256cf3ea9f0caa"
+  integrity sha512-H/I8Y5RRUEPaVhjc/27KHJv+TdrghrXBQTIkY2KAJjWAYnbLWaJgmUHbZxxOd/cq4jbxcZ4dz8/iRD8zeBDPeQ==
 
 yallist@^4.0.0:
   version "4.0.0"

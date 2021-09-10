@@ -20,7 +20,6 @@ const examplesWebpackConfig = merge(commonWebpackConfig, {
   entry: {
     examples: path.resolve(Paths.Examples, "index.tsx"),
   },
-  externals: {},
   optimization,
   output: {
     path: Paths.DistExample,
