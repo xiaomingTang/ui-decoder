@@ -73,7 +73,7 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   protected onMouseUp: MouseEventHandler = (e) => {
     if (e.button === 0) { // 左键被释放
       this.isMouseDown = false
-      this.smoothMoveEnd(
+      this.smoothMove(
         this.mouseMoveHistory.getAvgSpeed(),
         20,
         Date.now() + this.SMOOTH_MOVE_DELTA_TIME,
@@ -101,7 +101,7 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
 
   // 其他方法
 
-  protected smoothMoveEnd = (speed: SimpleVector, times: number, stopTime?: number) => {
+  protected smoothMove = (speed: SimpleVector, times: number, stopTime?: number) => {
     if (times <= 0 || this.isMouseDown || (stopTime && Date.now() > stopTime)) {
       return
     }
@@ -124,7 +124,7 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
       speed,
     })
     window.requestAnimationFrame(() => {
-      this.smoothMoveEnd(nextSpeed, times - 1)
+      this.smoothMove(nextSpeed, times - 1)
     })
   }
 
