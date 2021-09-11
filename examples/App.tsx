@@ -1,6 +1,6 @@
 import { hot } from "react-hot-loader/root"
 import React, {
-  useCallback, useEffect, useRef, useState,
+  useCallback, useEffect, useState,
 } from "react"
 
 import "@Examples/global"
