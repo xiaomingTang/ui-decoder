@@ -6,11 +6,7 @@ export interface SimpleVector {
   time: number;
 }
 
-export class MouseHistory {
-  protected WHEEL_DELTA_X = 0
-
-  protected WHEEL_DELTA_Y = 0
-
+export class TouchHistory {
   protected list: SimpleVector[] = []
 
   /**
@@ -70,7 +66,7 @@ export class MouseHistory {
     return speedList
   }
 
-  push(p: SimpleVector): MouseHistory {
+  push(p: SimpleVector): TouchHistory {
     this.list.push(p)
     const deleteCount = this.list.length - this.limit
     if (deleteCount > 0) {
@@ -79,30 +75,7 @@ export class MouseHistory {
     return this
   }
 
-  pushFromMouseEvent(e: MouseEvent): MouseHistory {
-    return this.push({
-      x: e.clientX,
-      y: e.clientY,
-      time: Date.now(),
-    })
-  }
-
-  pushFromWheelEvent(e: WheelEvent): MouseHistory {
-    let y = 0
-    if (e.deltaY > 0) {
-      y = 1
-    } else if (e.deltaY < 0) {
-      y = -1
-    }
-    this.WHEEL_DELTA_Y += y
-    return this.push({
-      x: 0,
-      y: this.WHEEL_DELTA_Y,
-      time: Date.now(),
-    })
-  }
-
-  clear(): MouseHistory {
+  clear(): TouchHistory {
     this.list = []
     return this
   }
@@ -126,20 +99,19 @@ export class MouseHistory {
   }
 
   /**
-   * 返回最后两个点间的速度(像素/ms)
+   * 返回最后两个点间的速度
    */
   getLastSpeed(): SimpleVector {
     const lastDelta = this.getLastDelta()
-    const { time } = lastDelta
     return {
-      x: time === 0 ? 0 : lastDelta.x / time,
-      y: time === 0 ? 0 : lastDelta.y / time,
-      time,
+      x: lastDelta.time === 0 ? 0 : lastDelta.x / lastDelta.time,
+      y: lastDelta.time === 0 ? 0 : lastDelta.y / lastDelta.time,
+      time: lastDelta.time,
     }
   }
 
   /**
-   * 返回最近一段时间(this.timeLimit)内的平均速度(像素/ms)
+   * 返回最近一段时间(this.timeLimit)内的平均速度
    */
   getAvgSpeed(): SimpleVector {
     const speedList = this.getSpeedList()
@@ -161,16 +133,12 @@ export class MouseHistory {
     const xSpeedList = speedList.filter((item) => (item.x * lastNonZeroSpeed.x > 0))
     const ySpeedList = speedList.filter((item) => (item.y * lastNonZeroSpeed.y > 0))
     const maxLen = Math.max(xSpeedList.length, ySpeedList.length)
-    const maxLenSpeedList = maxLen === xSpeedList.length ? xSpeedList : ySpeedList
     return {
       // 仅计算同向的速度的平均值
-      // 没写错, 是除以 maxLen, 这是为了规避 "当某个方向上有效速度较少时, 表明用户在该方向上移动较少, 但计算所得平均速度仍然很大" 的bug
       x: xSpeedList.length === 0 ? 0 : xSpeedList.reduce((prev, cur) => prev + cur.x, 0) / maxLen,
       y: ySpeedList.length === 0 ? 0 : ySpeedList.reduce((prev, cur) => prev + cur.y, 0) / maxLen,
-      // time 以 有效速度多的 方向上时间平均值计算
-      time: maxLen === 0
-        ? 0
-        : maxLenSpeedList.reduce((prev, cur) => prev + cur.time, 0) / maxLen,
+      // time 以 x 方向上时间平均值计算
+      time: xSpeedList.length === 0 ? 0 : xSpeedList.reduce((prev, cur) => prev + cur.time, 0) / maxLen,
     }
   }
 }

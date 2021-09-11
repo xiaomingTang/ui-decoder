@@ -5,6 +5,9 @@ import { MouseHistory, SimpleVector } from "@Src/utils/mouse"
 type DecoderEvent = {
   move: [{
     vector: SimpleVector;
+    /**
+     * 速度的单位是像素每ms
+     */
     speed: SimpleVector;
   }];
   smoothMove: [{
@@ -37,9 +40,12 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
 
   protected wheelHistory = new MouseHistory()
 
-  protected SMOOTH_MOVE_RATIO = 10
+  protected SMOOTH_MOVE_RATIO = 100
 
-  protected SMOOTH_MOVE_DELTA_TIME = 1000
+  /**
+   * 移动结束后的"制动时间"
+   */
+  protected SMOOTH_MOVE_DELTA_TIME = 250
 
   protected SMOOTH_SCALE_DELTA_TIME = 1000
 
@@ -72,10 +78,13 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   protected onMouseUp: MouseEventHandler = (e) => {
     if (e.button === 0) { // 左键被释放
       this.isMouseDown = false
+      const now = Date.now()
       this.smoothMove(
         this.mouseMoveHistory.getAvgSpeed(),
-        20,
-        Date.now() + this.SMOOTH_MOVE_DELTA_TIME,
+        this.SMOOTH_MOVE_RATIO,
+        now,
+        now,
+        now + this.SMOOTH_MOVE_DELTA_TIME,
       )
       this.mouseMoveHistory.clear()
     }
@@ -100,29 +109,23 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
 
   // 其他方法
 
-  protected smoothMove = (speed: SimpleVector, times: number, stopTime?: number) => {
-    if (times <= 0 || this.isMouseDown || (stopTime && Date.now() > stopTime)) {
+  protected smoothMove = (speed: SimpleVector, ratio: number, prevRunTime: number, startTime: number, stopTime: number) => {
+    const now = Date.now()
+    if (this.isMouseDown || (now < startTime) || (now > stopTime)) {
       return
     }
+    const duration = now - prevRunTime
+    const timeRatio = (stopTime - now) / (stopTime - startTime)
     const vector: SimpleVector = {
-      x: speed.x * this.SMOOTH_MOVE_RATIO,
-      y: speed.y * this.SMOOTH_MOVE_RATIO,
-      time: 0,
-    }
-    const nextSpeed: SimpleVector = times <= 1 ? {
-      x: 0,
-      y: 0,
-      time: 0,
-    } : {
-      x: speed.x * ((times - 1) / times),
-      y: speed.y * ((times - 1) / times),
-      time: speed.time * (1 / times),
+      x: speed.x * duration * timeRatio,
+      y: speed.y * duration * timeRatio,
+      time: now,
     }
     this.emit("smoothMove", {
       vector,
     })
     window.requestAnimationFrame(() => {
-      this.smoothMove(nextSpeed, times - 1)
+      this.smoothMove(speed, ratio, now, startTime, stopTime)
     })
   }
 
