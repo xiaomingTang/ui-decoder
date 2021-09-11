@@ -3,6 +3,9 @@
 export interface SimpleVector {
   x: number;
   y: number;
+}
+
+export interface SimpleVectorWithTime extends SimpleVector {
   time: number;
 }
 
@@ -11,7 +14,10 @@ export class MouseHistory {
 
   protected WHEEL_DELTA_Y = 0
 
-  protected list: SimpleVector[] = []
+  /**
+   * 鼠标位置(包含time)列表
+   */
+  protected list: SimpleVectorWithTime[] = []
 
   /**
    * list 长度限制在 20
@@ -27,17 +33,17 @@ export class MouseHistory {
    * 返回两点间的向量(由 oldPosition 出发, 指向 newPosition)
    */
   protected getDelta(
-    oldPosition: SimpleVector = {
+    oldPosition: SimpleVectorWithTime = {
       x: 0,
       y: 0,
       time: 0,
     },
-    newPosition: SimpleVector = {
+    newPosition: SimpleVectorWithTime = {
       x: 0,
       y: 0,
       time: 0,
     },
-  ): SimpleVector {
+  ): SimpleVectorWithTime {
     return {
       x: newPosition.x - oldPosition.x,
       y: newPosition.y - oldPosition.y,
@@ -48,7 +54,7 @@ export class MouseHistory {
   /**
    * 计算最近一段时间(this.timeLimit)内所有点之间的速度
    */
-  protected getSpeedList(): SimpleVector[] {
+  protected getSpeedList(): SimpleVectorWithTime[] {
     const now = Date.now()
     const list = this.list.filter((item) => (item.time > (now - this.timeLimit)))
     this.list = list
@@ -56,7 +62,7 @@ export class MouseHistory {
     if (len < 2) {
       return []
     }
-    const speedList: SimpleVector[] = []
+    const speedList: SimpleVectorWithTime[] = []
     for (let i = 0; i < len - 1; i += 1) {
       const cur = list[i]
       const next = list[i + 1]
@@ -70,7 +76,7 @@ export class MouseHistory {
     return speedList
   }
 
-  push(p: SimpleVector): MouseHistory {
+  push(p: SimpleVectorWithTime): MouseHistory {
     this.list.push(p)
     const deleteCount = this.list.length - this.limit
     if (deleteCount > 0) {
@@ -107,7 +113,7 @@ export class MouseHistory {
     return this
   }
 
-  getLastVector(): SimpleVector {
+  getLastVector(): SimpleVectorWithTime {
     return this.list[this.list.length - 1] || {
       x: 0,
       y: 0,
@@ -118,7 +124,7 @@ export class MouseHistory {
   /**
    * 返回最后两个点间的位置向量
    */
-  getLastDelta(): SimpleVector {
+  getLastDelta(): SimpleVectorWithTime {
     const len = this.list.length
     const lastElem = this.list[len - 1]
     const lastButTwoElem = this.list[len - 2]
@@ -128,7 +134,7 @@ export class MouseHistory {
   /**
    * 返回最后两个点间的速度(像素/ms)
    */
-  getLastSpeed(): SimpleVector {
+  getLastSpeed(): SimpleVectorWithTime {
     const lastDelta = this.getLastDelta()
     const { time } = lastDelta
     return {
@@ -141,7 +147,7 @@ export class MouseHistory {
   /**
    * 返回最近一段时间(this.timeLimit)内的平均速度(像素/ms)
    */
-  getAvgSpeed(): SimpleVector {
+  getAvgSpeed(): SimpleVectorWithTime {
     const speedList = this.getSpeedList()
     const len = speedList.length
     const lastNonZeroSpeed = {
@@ -171,6 +177,13 @@ export class MouseHistory {
       time: maxLen === 0
         ? 0
         : maxLenSpeedList.reduce((prev, cur) => prev + cur.time, 0) / maxLen,
+    }
+  }
+
+  static getPositionFromMouseEvent(e: MouseEvent | WheelEvent): SimpleVector {
+    return {
+      x: e.clientX,
+      y: e.clientY,
     }
   }
 }

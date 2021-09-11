@@ -21,7 +21,7 @@ function App() {
   const [wheelDelta, setWheelDelta] = useState(0)
   const onInit = useCallback((elem: HTMLDivElement | null) => {
     if (elem) {
-      setMouseDecoder(new MouseDecoder(elem, false))
+      setMouseDecoder(new MouseDecoder(elem, elem, false))
     }
   }, [])
 

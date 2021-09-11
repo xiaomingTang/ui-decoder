@@ -1,29 +1,31 @@
 /* eslint-disable class-methods-use-this */
 import EventEmitter from "eventemitter3"
-import { MouseHistory, SimpleVector } from "@Src/utils/mouse-history"
+import { MouseHistory, SimpleVector, SimpleVectorWithTime } from "@Src/utils/mouse-history"
 
 type DecoderEvent = {
   move: [{
-    vector: SimpleVector;
+    vector: SimpleVectorWithTime;
     /**
      * 速度的单位是像素每ms
      */
-    speed: SimpleVector;
+    speed: SimpleVectorWithTime;
   }];
   smoothMove: [{
-    vector: SimpleVector;
+    vector: SimpleVectorWithTime;
   }];
   scale: [{
     /**
      * vector.y 表示滚轮滚动了 y 次(y > 0 表示向下滚, y < 0 表示向上滚)
      */
-    vector: SimpleVector;
+    vector: SimpleVectorWithTime;
+    center: SimpleVector;
   }];
   smoothScale: [{
     /**
      * vector.y 表示滚轮滚动了 y 次(y > 0 表示向下滚, y < 0 表示向上滚)
      */
-    vector: SimpleVector;
+    vector: SimpleVectorWithTime;
+    center: SimpleVector;
   }];
 }
 
@@ -34,7 +36,12 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   /**
    * 监听的元素
    */
-  protected element: HTMLElement
+  protected triggerElement: HTMLElement
+
+  /**
+   * 控制的元素
+   */
+  protected targetElement: HTMLElement
 
   protected mouseMoveHistory = new MouseHistory()
 
@@ -122,6 +129,7 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     // 滚轮事件触发之初, 立即停止之前没来得及调用的 smoothScale 方法
     window.cancelAnimationFrame(this.smoothScaleFlag)
     this.wheelHistory.pushFromWheelEvent(e)
+    const center = MouseHistory.getPositionFromMouseEvent(e)
 
     if (this.ENABLE_SMOOTH_SCALE) {
       const now = Date.now()
@@ -131,10 +139,12 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
         now,
         now,
         now + this.SMOOTH_SCALE_DELTA_TIME,
+        center,
       )
     } else {
       this.emit("scale", {
         vector: this.wheelHistory.getLastDelta(),
+        center,
       })
     }
   }
@@ -145,14 +155,14 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
 
   // 其他方法
 
-  protected smoothMove = (speed: SimpleVector, ratio: number, prevRunTime: number, startTime: number, stopTime: number) => {
+  protected smoothMove = (speed: SimpleVectorWithTime, ratio: number, prevRunTime: number, startTime: number, stopTime: number) => {
     const now = Date.now()
     if (this.isMouseDown || (now < startTime) || (now > stopTime)) {
       return
     }
     const duration = now - prevRunTime
     const timeRatio = (stopTime - now) / (stopTime - startTime)
-    const vector: SimpleVector = {
+    const vector: SimpleVectorWithTime = {
       x: speed.x * duration * timeRatio * ratio,
       y: speed.y * duration * timeRatio * ratio,
       time: now,
@@ -165,46 +175,48 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     })
   }
 
-  protected smoothScale = (speed: SimpleVector, ratio: number, prevRunTime: number, startTime: number, stopTime: number) => {
+  protected smoothScale = (speed: SimpleVectorWithTime, ratio: number, prevRunTime: number, startTime: number, stopTime: number, center: SimpleVector) => {
     const now = Date.now()
     if ((now < startTime) || (now > stopTime)) {
       return
     }
     const duration = now - prevRunTime
     const timeRatio = (stopTime - now) / (stopTime - startTime)
-    const vector: SimpleVector = {
+    const vector: SimpleVectorWithTime = {
       x: speed.x * duration * timeRatio * ratio,
       y: speed.y * duration * timeRatio * ratio,
       time: now,
     }
     this.emit("smoothScale", {
       vector,
+      center,
     })
     window.requestAnimationFrame(() => {
-      this.smoothScale(speed, ratio, now, startTime, stopTime)
+      this.smoothScale(speed, ratio, now, startTime, stopTime, center)
     })
   }
 
-  constructor(elememt: HTMLElement, listen = true) {
+  constructor(elememt: HTMLElement, targetElement = elememt, listen = true) {
     super()
-    this.element = elememt
+    this.triggerElement = elememt
+    this.targetElement = targetElement
     if (listen) {
       this.subscribe()
     }
   }
 
   subscribe() {
-    this.element.addEventListener("mousedown", this.onMouseDown)
-    this.element.addEventListener("dblclick", this.onDoubleClick)
-    this.element.addEventListener("wheel", this.onWheel)
+    this.triggerElement.addEventListener("mousedown", this.onMouseDown)
+    this.triggerElement.addEventListener("dblclick", this.onDoubleClick)
+    this.triggerElement.addEventListener("wheel", this.onWheel)
     document.addEventListener("mousemove", this.onMouseMove)
     document.addEventListener("mouseup", this.onMouseUp)
   }
 
   unsubscribe() {
-    this.element.removeEventListener("mousedown", this.onMouseDown)
-    this.element.removeEventListener("dblclick", this.onDoubleClick)
-    this.element.removeEventListener("wheel", this.onWheel)
+    this.triggerElement.removeEventListener("mousedown", this.onMouseDown)
+    this.triggerElement.removeEventListener("dblclick", this.onDoubleClick)
+    this.triggerElement.removeEventListener("wheel", this.onWheel)
     document.removeEventListener("mousemove", this.onMouseMove)
     document.removeEventListener("mouseup", this.onMouseUp)
   }
