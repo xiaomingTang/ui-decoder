@@ -40,14 +40,42 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
 
   protected wheelHistory = new MouseHistory()
 
-  protected SMOOTH_MOVE_RATIO = 100
+  /**
+   * 用户停止"甩动"节点后, 有一个"制动距离"
+   *
+   * 制动发生时的初始速度(由制动前一段时间内的平均速度计算而来, 单位是像素/ms)通常为 0.5-1.0 左右
+   *
+   * 我们可以给这个"初始速度"乘以一个倍率, 该属性就是这个"倍率"
+   */
+  protected SMOOTH_MOVE_RATIO = 1.1
 
   /**
-   * 移动结束后的"制动时间"
+   * 用户停止"甩动"节点后的"制动时间"
    */
   protected SMOOTH_MOVE_DELTA_TIME = 250
 
-  protected SMOOTH_SCALE_DELTA_TIME = 1000
+  /**
+   * 鼠标缩放比拖拽更加离散(通常滚动一次滚轮, 需要提供较大的缩放)
+   *
+   * 所以缩放事件拥有一个开关, 在滚轮事件触发伊始, 要么触发 scale, 要么触发 smoothScale, 二选一
+   *
+   * 而非像拖动事件那样, 拖动时触发 move, 拖动结束后触发 smoothMove
+   */
+  protected ENABLE_SMOOTH_SCALE = true
+
+  /**
+   * 用户停止"缩放"节点后, 有一个"制动距离"
+   *
+   * 制动发生时的初始速度始终为 1, 表示每毫秒发生一次滚动
+   *
+   * 我们可以给这个"初始速度"乘以一个倍率, 该属性就是这个"倍率"
+   */
+   protected SMOOTH_SCALE_RATIO = 0.01
+
+  /**
+   * 用户停止"缩放"节点后的"制动时间"
+   */
+  protected SMOOTH_SCALE_DELTA_TIME = 250
 
   /**
    * 鼠标是否按下
@@ -91,16 +119,24 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   }
 
   protected onWheel: WheelHandler = (e) => {
+    // 滚轮事件触发之初, 立即停止之前没来得及调用的 smoothScale 方法
     window.cancelAnimationFrame(this.smoothScaleFlag)
     this.wheelHistory.pushFromWheelEvent(e)
-    // this.emit("scale", {
-    //   vector: this.wheelHistory.getLastDelta(),
-    // })
-    this.smoothScale(
-      this.wheelHistory.getLastDelta(),
-      10,
-      Date.now() + this.SMOOTH_SCALE_DELTA_TIME,
-    )
+
+    if (this.ENABLE_SMOOTH_SCALE) {
+      const now = Date.now()
+      this.smoothScale(
+        this.wheelHistory.getLastDelta(),
+        this.SMOOTH_SCALE_RATIO,
+        now,
+        now,
+        now + this.SMOOTH_SCALE_DELTA_TIME,
+      )
+    } else {
+      this.emit("scale", {
+        vector: this.wheelHistory.getLastDelta(),
+      })
+    }
   }
 
   protected onDoubleClick: MouseEventHandler = (e) => {
@@ -117,8 +153,8 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     const duration = now - prevRunTime
     const timeRatio = (stopTime - now) / (stopTime - startTime)
     const vector: SimpleVector = {
-      x: speed.x * duration * timeRatio,
-      y: speed.y * duration * timeRatio,
+      x: speed.x * duration * timeRatio * ratio,
+      y: speed.y * duration * timeRatio * ratio,
       time: now,
     }
     this.emit("smoothMove", {
@@ -129,27 +165,24 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     })
   }
 
-  protected smoothScale = (speed: SimpleVector, times: number, stopTime?: number) => {
-    const d: SimpleVector = {
-      x: (2 * speed.x) / times / (times - 1),
-      y: (2 * speed.y) / times / (times - 1),
-      time: speed.time / times,
+  protected smoothScale = (speed: SimpleVector, ratio: number, prevRunTime: number, startTime: number, stopTime: number) => {
+    const now = Date.now()
+    if ((now < startTime) || (now > stopTime)) {
+      return
     }
-    const smoothScale = (i: number) => {
-      if (i < 0 || (stopTime && Date.now() > stopTime)) {
-        return
-      }
-      const vector = {
-        x: d.x * i,
-        y: d.y * i,
-        time: d.time,
-      }
-      this.emit("smoothScale", {
-        vector,
-      })
-      this.smoothScaleFlag = window.requestAnimationFrame(() => smoothScale(i - 1))
+    const duration = now - prevRunTime
+    const timeRatio = (stopTime - now) / (stopTime - startTime)
+    const vector: SimpleVector = {
+      x: speed.x * duration * timeRatio * ratio,
+      y: speed.y * duration * timeRatio * ratio,
+      time: now,
     }
-    smoothScale(times - 1)
+    this.emit("smoothScale", {
+      vector,
+    })
+    window.requestAnimationFrame(() => {
+      this.smoothScale(speed, ratio, now, startTime, stopTime)
+    })
   }
 
   constructor(elememt: HTMLElement, listen = true) {

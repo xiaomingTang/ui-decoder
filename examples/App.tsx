@@ -5,6 +5,7 @@ import React, {
 
 import "@Examples/global"
 import { MouseDecoder } from "@Src/index"
+import { geneWheelHandler } from "@Src/utils/scale"
 
 import Styles from "./App.module.less"
 
@@ -12,10 +13,12 @@ function voidFunc() {
   // pass
 }
 
+const [wheelDeltaSetter, wheelDeltaToScalar] = geneWheelHandler()
+
 function App() {
   const [mouseDecoder, setMouseDecoder] = useState<MouseDecoder>()
   const [translate, setTranslate] = useState({ x: 0, y: 0 })
-  const [scalar, setScalar] = useState(1)
+  const [wheelDelta, setWheelDelta] = useState(0)
   const onInit = useCallback((elem: HTMLDivElement | null) => {
     if (elem) {
       setMouseDecoder(new MouseDecoder(elem, false))
@@ -38,28 +41,10 @@ function App() {
         }))
       })
       mouseDecoder.addListener("scale", ({ vector }) => {
-        setScalar((prev) => {
-          const y = vector.y * -0.2
-          if (prev >= 1) {
-            return prev + y
-          }
-          if (y > 0) {
-            return prev + y
-          }
-          return prev * (1 + y)
-        })
+        setWheelDelta(wheelDeltaSetter(-vector.y))
       })
       mouseDecoder.addListener("smoothScale", ({ vector }) => {
-        setScalar((prev) => {
-          const y = vector.y * -0.3
-          if (prev >= 1) {
-            return prev + y
-          }
-          if (y > 0) {
-            return prev + y
-          }
-          return prev * (1 + y)
-        })
+        setWheelDelta(wheelDeltaSetter(-vector.y))
       })
       return () => {
         mouseDecoder.removeAllListeners()
@@ -72,7 +57,7 @@ function App() {
   return <div
     className={Styles.scrollElem}
     style={{
-      transform: `translate(${translate.x}px,${translate.y}px) scale(${scalar},${scalar})`,
+      transform: `translate(${translate.x}px,${translate.y}px) scale(${wheelDeltaToScalar(wheelDelta)},${wheelDeltaToScalar(wheelDelta)})`,
     }}
     ref={onInit}
   />
