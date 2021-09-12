@@ -36,16 +36,23 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   /**
    * 监听的元素
    */
-  protected triggerElement: HTMLElement
+  triggerElement: HTMLElement
 
   /**
    * 控制的元素
    */
-  protected targetElement: HTMLElement
+  targetElement: HTMLElement
 
   protected mouseMoveHistory = new MouseHistory()
 
   protected wheelHistory = new MouseHistory()
+
+  /**
+   * 鼠标是否按下
+   */
+  protected isMouseDown = false
+
+  protected smoothScaleFlag = -1
 
   /**
    * 用户停止"甩动"节点后, 有一个"制动距离"
@@ -54,12 +61,12 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    *
    * 我们可以给这个"初始速度"乘以一个倍率, 该属性就是这个"倍率"
    */
-  protected SMOOTH_MOVE_RATIO = 1.1
+  SMOOTH_MOVE_RATIO = 1.1
 
   /**
    * 用户停止"甩动"节点后的"制动时间"
    */
-  protected SMOOTH_MOVE_DELTA_TIME = 250
+  SMOOTH_MOVE_DELTA_TIME = 250
 
   /**
    * 鼠标缩放比拖拽更加离散(通常滚动一次滚轮, 需要提供较大的缩放)
@@ -68,7 +75,7 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    *
    * 而非像拖动事件那样, 拖动时触发 move, 拖动结束后触发 smoothMove
    */
-  protected ENABLE_SMOOTH_SCALE = true
+  ENABLE_SMOOTH_SCALE = true
 
   /**
    * 用户停止"缩放"节点后, 有一个"制动距离"
@@ -77,19 +84,12 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    *
    * 我们可以给这个"初始速度"乘以一个倍率, 该属性就是这个"倍率"
    */
-   protected SMOOTH_SCALE_RATIO = 0.01
+  SMOOTH_SCALE_RATIO = 0.01
 
   /**
    * 用户停止"缩放"节点后的"制动时间"
    */
-  protected SMOOTH_SCALE_DELTA_TIME = 250
-
-  /**
-   * 鼠标是否按下
-   */
-  protected isMouseDown = false
-
-  protected smoothScaleFlag = -1
+  SMOOTH_SCALE_DELTA_TIME = 250
 
   // 鼠标事件回调
 
@@ -205,6 +205,9 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     }
   }
 
+  /**
+   * 为相关节点添加事件监听
+   */
   subscribe() {
     this.triggerElement.addEventListener("mousedown", this.onMouseDown)
     this.triggerElement.addEventListener("dblclick", this.onDoubleClick)
@@ -213,6 +216,9 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     document.addEventListener("mouseup", this.onMouseUp)
   }
 
+  /**
+   * 移除相关节点的事件监听
+   */
   unsubscribe() {
     this.triggerElement.removeEventListener("mousedown", this.onMouseDown)
     this.triggerElement.removeEventListener("dblclick", this.onDoubleClick)
