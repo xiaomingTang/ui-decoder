@@ -6,11 +6,8 @@ import { Matrix3, Vector2 } from "three"
 
 import "@Examples/global"
 import { MouseDecoder } from "@Src/index"
-import { geneWheelHandler } from "@Src/utils/scale"
 
 import Styles from "./App.module.less"
-
-const [wheelDeltaSetter, wheelDeltaToScalar] = geneWheelHandler()
 
 function voidFunc() {
   // pass
@@ -48,7 +45,7 @@ function App() {
   // mouseDecoder 初始化
   useEffect(() => {
     if (mouseDecoder) {
-      mouseDecoder.ENABLE_SMOOTH_SCALE = false
+      mouseDecoder.ENABLE_SMOOTH_SCALE = true
       mouseDecoder.subscribe()
 
       return () => {
@@ -72,8 +69,8 @@ function App() {
       // 初步搞定缩放矩阵
       // @TODO: 缩放比例问题, 需要计算出当前元素尺寸, 结合尺寸给出最终缩放
       mouseDecoder.addListener("scale", ({ vector, center }) => {
-        const sx = wheelDeltaToScalar(-vector.y)
-        const sy = wheelDeltaToScalar(-vector.y)
+        const sx = vector.y
+        const sy = vector.y
         const x = rawCenterRef.current.x - center.x
         const y = rawCenterRef.current.y - center.y
         // 复合矩阵 http://staff.ustc.edu.cn/~lfdong/teach/2011cgbk/PPT/chp5.pdf
@@ -85,8 +82,8 @@ function App() {
         setMatrixArray(matrixRef.current.toArray())
       })
       mouseDecoder.addListener("smoothScale", ({ vector, center }) => {
-        const sx = wheelDeltaToScalar(-vector.y)
-        const sy = wheelDeltaToScalar(-vector.y)
+        const sx = vector.y
+        const sy = vector.y
         const x = rawCenterRef.current.x - center.x
         const y = rawCenterRef.current.y - center.y
         // 复合矩阵 http://staff.ustc.edu.cn/~lfdong/teach/2011cgbk/PPT/chp5.pdf

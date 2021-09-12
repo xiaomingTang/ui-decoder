@@ -1,6 +1,7 @@
 /* eslint-disable class-methods-use-this */
 import EventEmitter from "eventemitter3"
 import { MouseHistory, SimpleVector, SimpleVectorWithTime } from "@Src/utils/mouse-history"
+import { sumSmoothScaleMagicValue } from "@Src/utils/smooth-scale-magic-value"
 
 type DecoderEvent = {
   move: [{
@@ -57,16 +58,20 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   /**
    * 用户停止"甩动"节点后, 有一个"制动距离"
    *
-   * 制动发生时的初始速度(由制动前一段时间内的平均速度计算而来, 单位是像素/ms)通常为 0.5-1.0 左右
+   * 制动发生时的初始速度(由制动前一段时间内的平均速度计算而来, 单位是 像素/ms)通常为 0.5-1.0 左右
    *
    * 我们可以给这个"初始速度"乘以一个倍率, 该属性就是这个"倍率"
    */
-  SMOOTH_MOVE_RATIO = 1.1
+  SMOOTH_MOVE_RATIO = 12
 
   /**
-   * 用户停止"甩动"节点后的"制动时间"
+   * 用户停止"甩动"节点后的"制动函数"被调用的次数
+   *
+   * 次数越少, 停止得就越快
+   *
+   * this.SMOOTH_MOVE_RATIO 仅决定初始速度, 因此次数越多, "滑行"距离越远
    */
-  SMOOTH_MOVE_DELTA_TIME = 250
+  SMOOTH_MOVE_LIMIT_RUN_TIMES = 16
 
   /**
    * 鼠标缩放比拖拽更加离散(通常滚动一次滚轮, 需要提供较大的缩放)
@@ -78,18 +83,18 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   ENABLE_SMOOTH_SCALE = true
 
   /**
-   * 用户停止"缩放"节点后, 有一个"制动距离"
-   *
-   * 制动发生时的初始速度始终为 1, 表示每毫秒发生一次滚动
-   *
-   * 我们可以给这个"初始速度"乘以一个倍率, 该属性就是这个"倍率"
+   * 用户滚动一次滚轮时, 缩放的倍数
    */
-  SMOOTH_SCALE_RATIO = 0.01
+  SCALE_RATIO = 1.5
 
   /**
-   * 用户停止"缩放"节点后的"制动时间"
+   * 用户停止滚动滚轮后"smoothScale 制动函数"被调用的次数
+   *
+   * 次数越少, 停止得就越快
+   *
+   * 但最终的缩放倍数始终由 this.SCALE_RATIO 决定, 不因执行次数改变而改变
    */
-  SMOOTH_SCALE_DELTA_TIME = 250
+  SMOOTH_SCALE_LIMIT_RUN_TIMES = 5
 
   // 鼠标事件回调
 
@@ -113,13 +118,9 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   protected onMouseUp: MouseEventHandler = (e) => {
     if (e.button === 0) { // 左键被释放
       this.isMouseDown = false
-      const now = Date.now()
       this.smoothMove(
         this.mouseMoveHistory.getAvgSpeed(),
         this.SMOOTH_MOVE_RATIO,
-        now,
-        now,
-        now + this.SMOOTH_MOVE_DELTA_TIME,
       )
       this.mouseMoveHistory.clear()
     }
@@ -132,69 +133,71 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     const center = MouseHistory.getPositionFromMouseEvent(e)
 
     if (this.ENABLE_SMOOTH_SCALE) {
-      const now = Date.now()
       this.smoothScale(
-        this.wheelHistory.getLastDelta(),
-        this.SMOOTH_SCALE_RATIO,
-        now,
-        now,
-        now + this.SMOOTH_SCALE_DELTA_TIME,
+        this.wheelDeltaToScalar(this.wheelHistory.getLastDelta(), this.SCALE_RATIO),
         center,
       )
     } else {
       this.emit("scale", {
-        vector: this.wheelHistory.getLastDelta(),
+        vector: this.wheelDeltaToScalar(this.wheelHistory.getLastDelta(), this.SCALE_RATIO),
         center,
       })
     }
   }
 
-  protected onDoubleClick: MouseEventHandler = (e) => {
-    // this.emit
-  }
-
   // 其他方法
 
-  protected smoothMove = (speed: SimpleVectorWithTime, ratio: number, prevRunTime: number, startTime: number, stopTime: number) => {
-    const now = Date.now()
-    if (this.isMouseDown || (now < startTime) || (now > stopTime)) {
+  protected smoothMove = (speed: SimpleVectorWithTime, ratio: number, RUN_TIMES = 0) => {
+    if (this.isMouseDown || RUN_TIMES >= this.SMOOTH_MOVE_LIMIT_RUN_TIMES) {
       return
     }
-    const duration = now - prevRunTime
-    const timeRatio = (stopTime - now) / (stopTime - startTime)
     const vector: SimpleVectorWithTime = {
-      x: speed.x * duration * timeRatio * ratio,
-      y: speed.y * duration * timeRatio * ratio,
-      time: now,
+      x: speed.x * ratio * ((1 - RUN_TIMES / this.SMOOTH_MOVE_LIMIT_RUN_TIMES)),
+      y: speed.y * ratio * ((1 - RUN_TIMES / this.SMOOTH_MOVE_LIMIT_RUN_TIMES)),
+      time: Date.now(),
     }
     this.emit("smoothMove", {
       vector,
     })
     window.requestAnimationFrame(() => {
-      this.smoothMove(speed, ratio, now, startTime, stopTime)
+      this.smoothMove(speed, ratio, RUN_TIMES + 1)
     })
   }
 
-  protected smoothScale = (speed: SimpleVectorWithTime, ratio: number, prevRunTime: number, startTime: number, stopTime: number, center: SimpleVector) => {
-    const now = Date.now()
-    if ((now < startTime) || (now > stopTime)) {
+  /**
+   * 原理: (1 / 10) + (1 / 11) + ... + (1 / N) === MAGIC_SUM
+   *
+   * scalar ** { [(1 / 10) + (1 / 11) + ... + (1 / N)] / MAGIC_SUM} ≈ scalar
+   *
+   * @param PREV_RUN_TIME 函数自己在循环中自动设置的变量, 手动调用时禁止设置/传入
+   * @param MAGIC_TIMES 函数自己在循环中自动设置的变量, 手动调用时禁止设置/传入
+   */
+  protected smoothScale = (speed: SimpleVectorWithTime, center: SimpleVector, MAGIC_TIMES = 10) => {
+    if (MAGIC_TIMES >= this.SMOOTH_SCALE_LIMIT_RUN_TIMES + 10) {
       return
     }
-    const duration = now - prevRunTime
-    const timeRatio = (stopTime - now) / (stopTime - startTime)
-    const vector: SimpleVectorWithTime = {
-      x: speed.x * duration * timeRatio * ratio,
-      y: speed.y * duration * timeRatio * ratio,
-      time: now,
+    const MAGIC_SUM = sumSmoothScaleMagicValue(10, this.SMOOTH_SCALE_LIMIT_RUN_TIMES + 10 - 1)
+    const vector = {
+      x: speed.x ** (1 / MAGIC_TIMES / MAGIC_SUM),
+      y: speed.y ** (1 / MAGIC_TIMES / MAGIC_SUM),
+      time: Date.now(),
     }
-    this.emit("smoothScale", {
-      vector,
-      center,
-    })
+    if (vector.x > 0 && vector.y > 0) {
+      this.emit("smoothScale", {
+        vector,
+        center,
+      })
+    }
     window.requestAnimationFrame(() => {
-      this.smoothScale(speed, ratio, now, startTime, stopTime, center)
+      this.smoothScale(speed, center, MAGIC_TIMES + 1)
     })
   }
+
+  protected wheelDeltaToScalar = (wheelDelta: SimpleVectorWithTime, ratio: number): SimpleVectorWithTime => ({
+    x: wheelDelta.x > 0 ? 1 / ratio : ratio,
+    y: wheelDelta.y > 0 ? 1 / ratio : ratio,
+    time: wheelDelta.time,
+  })
 
   constructor(elememt: HTMLElement, targetElement = elememt, listen = true) {
     super()
@@ -210,7 +213,6 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    */
   subscribe() {
     this.triggerElement.addEventListener("mousedown", this.onMouseDown)
-    this.triggerElement.addEventListener("dblclick", this.onDoubleClick)
     this.triggerElement.addEventListener("wheel", this.onWheel)
     document.addEventListener("mousemove", this.onMouseMove)
     document.addEventListener("mouseup", this.onMouseUp)
@@ -221,7 +223,6 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    */
   unsubscribe() {
     this.triggerElement.removeEventListener("mousedown", this.onMouseDown)
-    this.triggerElement.removeEventListener("dblclick", this.onDoubleClick)
     this.triggerElement.removeEventListener("wheel", this.onWheel)
     document.removeEventListener("mousemove", this.onMouseMove)
     document.removeEventListener("mouseup", this.onMouseUp)

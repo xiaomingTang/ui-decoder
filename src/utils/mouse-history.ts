@@ -94,15 +94,15 @@ export class MouseHistory {
   }
 
   pushFromWheelEvent(e: WheelEvent): MouseHistory {
-    let y = 0
     if (e.deltaY > 0) {
-      y = 1
+      this.WHEEL_DELTA_X += 1
+      this.WHEEL_DELTA_Y += 1
     } else if (e.deltaY < 0) {
-      y = -1
+      this.WHEEL_DELTA_X += -1
+      this.WHEEL_DELTA_Y += -1
     }
-    this.WHEEL_DELTA_Y += y
     return this.push({
-      x: 0,
+      x: this.WHEEL_DELTA_X,
       y: this.WHEEL_DELTA_Y,
       time: Date.now(),
     })
