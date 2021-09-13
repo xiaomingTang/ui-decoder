@@ -1,7 +1,7 @@
 /* eslint-disable class-methods-use-this */
 import EventEmitter from "eventemitter3"
 import { SimpleVectorWithTime } from "@Src/recorders/recorder"
-import { MouseRecorder } from "@Src/recorders/mouse-recorder"
+import { TouchListRecorder } from "@Src/recorders/touch-list-recorder"
 import { sumSmoothScaleMagicValue } from "@Src/utils/smooth-scale-magic-value"
 
 type DecoderEvent = {
@@ -29,12 +29,12 @@ type DecoderEvent = {
     vector: SimpleVectorWithTime;
     center: SimpleVectorWithTime;
   }];
+  random: [number];
 }
 
-type MouseEventHandler = (e: MouseEvent) => void
-type WheelHandler = (e: WheelEvent) => void
+type TouchEventHandler = (e: TouchEvent) => void
 
-export class MouseDecoder extends EventEmitter<DecoderEvent> {
+export class TouchDecoder extends EventEmitter<DecoderEvent> {
   /**
    * 监听的元素
    */
@@ -45,16 +45,12 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    */
   targetElement: HTMLElement
 
-  protected mouseMoveRecorder = new MouseRecorder()
-
-  protected wheelRecorder = new MouseRecorder()
+  protected touchListRecorder = new TouchListRecorder()
 
   /**
    * 鼠标是否按下
    */
-  protected isMouseDown = false
-
-  protected smoothScaleFlag = -1
+  protected isTouching = false
 
   /**
    * 用户停止"甩动"节点后, 有一个"制动距离"
@@ -75,18 +71,9 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   SMOOTH_MOVE_LIMIT_RUN_TIMES = 16
 
   /**
-   * 鼠标缩放比拖拽更加离散(通常滚动一次滚轮, 需要提供较大的缩放)
-   *
-   * 所以缩放事件拥有一个开关, 在滚轮事件触发伊始, 要么触发 scale, 要么触发 smoothScale, 二选一
-   *
-   * 而非像拖动事件那样, 拖动时触发 move, 拖动结束后触发 smoothMove
-   */
-  ENABLE_SMOOTH_SCALE = true
-
-  /**
    * 用户滚动一次滚轮时, 缩放的倍数
    */
-  SCALE_RATIO = 1.5
+  SMOOTH_SCALE_RATIO = 1.5
 
   /**
    * 用户停止滚动滚轮后"smoothScale 制动函数"被调用的次数
@@ -99,57 +86,34 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
 
   // 鼠标事件回调
 
-  protected onMouseDown: MouseEventHandler = (e) => {
-    if (e.button === 0) { // 左键被按下
-      this.isMouseDown = true
-      this.mouseMoveRecorder.pushFromMouseEvent(e)
-    }
+  protected onTouchStart: TouchEventHandler = (e) => {
+    this.isTouching = true
+    this.touchListRecorder.updateListFromTouchList([...e.touches].slice(0, 2))
   }
 
-  protected onMouseMove: MouseEventHandler = (e) => {
-    if (this.isMouseDown) {
-      this.mouseMoveRecorder.pushFromMouseEvent(e)
+  /**
+   * @TODO: 多指(> 3)滑动一段时间后 touchmove 触发频率显著降低, 应该是需要 preventDefault, 有待加上
+   */
+  protected onTouchMove: TouchEventHandler = (e) => {
+    if (this.isTouching) {
+      this.touchListRecorder.updateListFromTouchList([...e.touches].slice(0, 2))
+      const delta = this.touchListRecorder.list[0]?.getLastDelta()
       this.emit("move", {
-        vector: this.mouseMoveRecorder.getLastDelta(),
-        speed: this.mouseMoveRecorder.getLastSpeed(),
+        vector: delta,
+        speed: this.touchListRecorder.list[0]?.getLastSpeed(),
       })
     }
   }
 
-  protected onMouseUp: MouseEventHandler = (e) => {
-    if (e.button === 0) { // 左键被释放
-      this.isMouseDown = false
-      this.smoothMove(
-        this.mouseMoveRecorder.getAvgSpeed(),
-        this.SMOOTH_MOVE_RATIO,
-      )
-      this.mouseMoveRecorder.clear()
-    }
-  }
-
-  protected onWheel: WheelHandler = (e) => {
-    // 滚轮事件触发之初, 立即停止之前没来得及调用的 smoothScale 方法
-    window.cancelAnimationFrame(this.smoothScaleFlag)
-    this.wheelRecorder.pushFromWheelEvent(e)
-    const center = MouseRecorder.getPositionFromMouseEvent(e)
-
-    if (this.ENABLE_SMOOTH_SCALE) {
-      this.smoothScale(
-        MouseRecorder.wheelDeltaToScalar(this.wheelRecorder.getLastDelta(), this.SCALE_RATIO),
-        center,
-      )
-    } else {
-      this.emit("scale", {
-        vector: MouseRecorder.wheelDeltaToScalar(this.wheelRecorder.getLastDelta(), this.SCALE_RATIO),
-        center,
-      })
-    }
+  protected onTouchEnd: TouchEventHandler = (e) => {
+    this.isTouching = false
+    this.touchListRecorder.clear()
   }
 
   // 其他方法
 
   protected smoothMove(speed: SimpleVectorWithTime, ratio: number, RUN_TIMES = 0) {
-    if (this.isMouseDown || RUN_TIMES >= this.SMOOTH_MOVE_LIMIT_RUN_TIMES) {
+    if (this.isTouching || RUN_TIMES >= this.SMOOTH_MOVE_LIMIT_RUN_TIMES) {
       return
     }
     const vector: SimpleVectorWithTime = {
@@ -207,19 +171,17 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    * 为相关节点添加事件监听
    */
   subscribe() {
-    this.triggerElement.addEventListener("mousedown", this.onMouseDown)
-    this.triggerElement.addEventListener("wheel", this.onWheel)
-    document.addEventListener("mousemove", this.onMouseMove)
-    document.addEventListener("mouseup", this.onMouseUp)
+    this.triggerElement.addEventListener("touchstart", this.onTouchStart)
+    document.addEventListener("touchmove", this.onTouchMove)
+    document.addEventListener("touchend", this.onTouchEnd)
   }
 
   /**
    * 移除相关节点的事件监听
    */
   unsubscribe() {
-    this.triggerElement.removeEventListener("mousedown", this.onMouseDown)
-    this.triggerElement.removeEventListener("wheel", this.onWheel)
-    document.removeEventListener("mousemove", this.onMouseMove)
-    document.removeEventListener("mouseup", this.onMouseUp)
+    this.triggerElement.removeEventListener("touchstart", this.onTouchStart)
+    document.removeEventListener("touchmove", this.onTouchMove)
+    document.removeEventListener("touchend", this.onTouchEnd)
   }
 }

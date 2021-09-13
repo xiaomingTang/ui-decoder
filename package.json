@@ -44,6 +44,7 @@
     "@babel/preset-typescript": "^7.12.1",
     "@babel/runtime-corejs3": "^7.12.1",
     "@hot-loader/react-dom": "^17.0.1",
+    "@types/lodash-es": "^4.17.5",
     "@types/mini-css-extract-plugin": "^2.2.0",
     "@types/node": "^14.0.6",
     "@types/react": "^17.0.2",
@@ -103,6 +104,7 @@
     "webpack-merge": "^5.2.0"
   },
   "dependencies": {
+    "lodash-es": "^4.17.21",
     "three": "^0.132.2",
     "xiaoming-hooks": "^0.1.2"
   }

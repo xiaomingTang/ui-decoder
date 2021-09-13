@@ -1,38 +1,31 @@
 /* eslint-disable class-methods-use-this */
 
-export interface SimpleVector {
+export interface SimpleVectorWithTime {
   x: number;
   y: number;
-}
-
-export interface SimpleVectorWithTime extends SimpleVector {
   time: number;
 }
 
-export class MouseHistory {
-  protected WHEEL_DELTA_X = 0
-
-  protected WHEEL_DELTA_Y = 0
-
+export class Recorder {
   /**
    * 鼠标位置(包含time)列表
    */
-  protected list: SimpleVectorWithTime[] = []
+  list: SimpleVectorWithTime[] = []
 
   /**
    * list 长度限制在 20
    */
-  protected limit = 20
+  limit = 5
 
   /**
    * 计算平均速度时, 仅计算 50ms 以内的位置
    */
-  protected timeLimit = 50
+  timeLimit = 50
 
   /**
    * 返回两点间的向量(由 oldPosition 出发, 指向 newPosition)
    */
-  protected getDelta(
+  getDelta(
     oldPosition: SimpleVectorWithTime = {
       x: 0,
       y: 0,
@@ -54,7 +47,7 @@ export class MouseHistory {
   /**
    * 计算最近一段时间(this.timeLimit)内所有点之间的速度
    */
-  protected getSpeedList(): SimpleVectorWithTime[] {
+  getSpeedList(): SimpleVectorWithTime[] {
     const now = Date.now()
     const list = this.list.filter((item) => (item.time > (now - this.timeLimit)))
     this.list = list
@@ -76,39 +69,17 @@ export class MouseHistory {
     return speedList
   }
 
-  push(p: SimpleVectorWithTime): MouseHistory {
+  push(p: SimpleVectorWithTime): this {
     this.list.push(p)
     const deleteCount = this.list.length - this.limit
     if (deleteCount > 0) {
-      this.list.splice(0, deleteCount)
+      this.list.shift()
+      // this.list.splice(0, deleteCount)
     }
     return this
   }
 
-  pushFromMouseEvent(e: MouseEvent): MouseHistory {
-    return this.push({
-      x: e.clientX,
-      y: e.clientY,
-      time: Date.now(),
-    })
-  }
-
-  pushFromWheelEvent(e: WheelEvent): MouseHistory {
-    if (e.deltaY > 0) {
-      this.WHEEL_DELTA_X += 1
-      this.WHEEL_DELTA_Y += 1
-    } else if (e.deltaY < 0) {
-      this.WHEEL_DELTA_X += -1
-      this.WHEEL_DELTA_Y += -1
-    }
-    return this.push({
-      x: this.WHEEL_DELTA_X,
-      y: this.WHEEL_DELTA_Y,
-      time: Date.now(),
-    })
-  }
-
-  clear(): MouseHistory {
+  clear(): this {
     this.list = []
     return this
   }
@@ -177,13 +148,6 @@ export class MouseHistory {
       time: maxLen === 0
         ? 0
         : maxLenSpeedList.reduce((prev, cur) => prev + cur.time, 0) / maxLen,
-    }
-  }
-
-  static getPositionFromMouseEvent(e: MouseEvent | WheelEvent): SimpleVector {
-    return {
-      x: e.clientX,
-      y: e.clientY,
     }
   }
 }
