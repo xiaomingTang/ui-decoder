@@ -1,5 +1,6 @@
 /* eslint-disable class-methods-use-this */
 import EventEmitter from "eventemitter3"
+import { Matrix3, Vector2 } from "three"
 import { SimpleVectorWithTime } from "@Src/recorders/recorder"
 import { TouchListRecorder } from "@Src/recorders/touch-list-recorder"
 import { sumSmoothScaleMagicValue } from "@Src/utils/smooth-scale-magic-value"
@@ -7,10 +8,6 @@ import { sumSmoothScaleMagicValue } from "@Src/utils/smooth-scale-magic-value"
 type DecoderEvent = {
   move: [{
     vector: SimpleVectorWithTime;
-    /**
-     * 速度的单位是像素每ms
-     */
-    speed: SimpleVectorWithTime;
   }];
   smoothMove: [{
     vector: SimpleVectorWithTime;
@@ -44,6 +41,12 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
    * 控制的元素
    */
   targetElement: HTMLElement
+
+  protected rawRect: DOMRect = new DOMRect()
+
+  protected rawCenter: Vector2 = new Vector2()
+
+  protected matrix: Matrix3 = new Matrix3()
 
   protected touchListRecorder = new TouchListRecorder()
 
@@ -88,7 +91,7 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
 
   protected onTouchStart: TouchEventHandler = (e) => {
     this.isTouching = true
-    this.touchListRecorder.updateListFromTouchList([...e.touches].slice(0, 2))
+    this.touchListRecorder.updateListFromTouchList(e.touches)
   }
 
   /**
@@ -96,18 +99,54 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
    */
   protected onTouchMove: TouchEventHandler = (e) => {
     if (this.isTouching) {
-      this.touchListRecorder.updateListFromTouchList([...e.touches].slice(0, 2))
+      this.touchListRecorder.updateListFromTouchList(e.changedTouches)
       const delta = this.touchListRecorder.list[0]?.getLastDelta()
-      this.emit("move", {
-        vector: delta,
-        speed: this.touchListRecorder.list[0]?.getLastSpeed(),
-      })
+      if (delta) {
+        this.emit("move", {
+          vector: delta,
+        })
+      }
     }
   }
 
   protected onTouchEnd: TouchEventHandler = (e) => {
     this.isTouching = false
+    const speed = this.touchListRecorder.list[0]?.getAvgSpeed()
+    if (speed) {
+      this.smoothMove(
+        speed,
+        this.SMOOTH_MOVE_RATIO,
+      )
+    }
     this.touchListRecorder.clear()
+  }
+
+  // 默认监听
+
+  onMove = (...[{ vector }]: DecoderEvent["move"]) => {
+    this.matrix.translate(vector.x, vector.y)
+    this.render()
+  }
+
+  onScale = (...[{ vector, center }]: DecoderEvent["scale"]) => {
+    const sx = vector.y
+    const sy = vector.y
+    const x = this.rawCenter.x - center.x
+    const y = this.rawCenter.y - center.y
+    // 复合矩阵 http://staff.ustc.edu.cn/~lfdong/teach/2011cgbk/PPT/chp5.pdf
+    // 算了, 不用复合矩阵了...
+    this.matrix
+      .translate(x, y)
+      .scale(sx, sy)
+      .translate(-x, -y)
+    this.render()
+  }
+
+  protected render() {
+    const { targetElement, matrix } = this
+    const els = matrix.elements
+    const transformCss = `matrix(${els[0]},${els[1]},${els[3]},${els[4]},${els[6]},${els[7]})`
+    targetElement.style.transform = transformCss
   }
 
   // 其他方法
@@ -174,6 +213,10 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
     this.triggerElement.addEventListener("touchstart", this.onTouchStart)
     document.addEventListener("touchmove", this.onTouchMove)
     document.addEventListener("touchend", this.onTouchEnd)
+    this.addListener("move", this.onMove)
+    this.addListener("smoothMove", this.onMove)
+    this.addListener("scale", this.onScale)
+    this.addListener("smoothScale", this.onScale)
   }
 
   /**
@@ -183,5 +226,9 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
     this.triggerElement.removeEventListener("touchstart", this.onTouchStart)
     document.removeEventListener("touchmove", this.onTouchMove)
     document.removeEventListener("touchend", this.onTouchEnd)
+    this.removeListener("move", this.onMove)
+    this.removeListener("smoothMove", this.onMove)
+    this.removeListener("scale", this.onScale)
+    this.removeListener("smoothScale", this.onScale)
   }
 }

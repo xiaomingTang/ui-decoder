@@ -1,10 +1,8 @@
+/* eslint-disable class-methods-use-this */
 import { Vector2 } from "three"
 import { SimpleVectorWithTime } from "./recorder"
 import { TouchRecorder } from "./touch-recorder"
 
-const tempVector = new Vector2()
-
-/* eslint-disable class-methods-use-this */
 export class TouchListRecorder {
   list: TouchRecorder[] = []
 
@@ -14,10 +12,11 @@ export class TouchListRecorder {
   }
 
   updateListFromTouchList(touchList: TouchList | Touch[]): this {
-    return this.updateList([...touchList].map((touch, i) => {
+    // 仅获取前 2 个 Touch
+    const realTouchList = touchList.length <= 2 ? [...touchList] : [touchList[0], touchList[1]]
+    return this.updateList(realTouchList.map((touch, i) => {
       const touchRecorder = this.list[i] || new TouchRecorder()
       touchRecorder.pushFromTouch(touch)
-      console.log(touchRecorder.list.length)
       return touchRecorder
     }))
   }

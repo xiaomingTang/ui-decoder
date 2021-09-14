@@ -1,5 +1,6 @@
 /* eslint-disable class-methods-use-this */
 import EventEmitter from "eventemitter3"
+import { Matrix3, Vector2 } from "three"
 import { SimpleVectorWithTime } from "@Src/recorders/recorder"
 import { MouseRecorder } from "@Src/recorders/mouse-recorder"
 import { sumSmoothScaleMagicValue } from "@Src/utils/smooth-scale-magic-value"
@@ -7,10 +8,6 @@ import { sumSmoothScaleMagicValue } from "@Src/utils/smooth-scale-magic-value"
 type DecoderEvent = {
   move: [{
     vector: SimpleVectorWithTime;
-    /**
-     * 速度的单位是像素每ms
-     */
-    speed: SimpleVectorWithTime;
   }];
   smoothMove: [{
     vector: SimpleVectorWithTime;
@@ -44,6 +41,12 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    * 控制的元素
    */
   targetElement: HTMLElement
+
+  protected rawRect: DOMRect = new DOMRect()
+
+  protected rawCenter: Vector2 = new Vector2()
+
+  protected matrix: Matrix3 = new Matrix3()
 
   protected mouseMoveRecorder = new MouseRecorder()
 
@@ -111,7 +114,6 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
       this.mouseMoveRecorder.pushFromMouseEvent(e)
       this.emit("move", {
         vector: this.mouseMoveRecorder.getLastDelta(),
-        speed: this.mouseMoveRecorder.getLastSpeed(),
       })
     }
   }
@@ -144,6 +146,34 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
         center,
       })
     }
+  }
+
+  // 默认监听
+
+  onMove = (...[{ vector }]: DecoderEvent["move"]) => {
+    this.matrix.translate(vector.x, vector.y)
+    this.render()
+  }
+
+  onScale = (...[{ vector, center }]: DecoderEvent["scale"]) => {
+    const sx = vector.y
+    const sy = vector.y
+    const x = this.rawCenter.x - center.x
+    const y = this.rawCenter.y - center.y
+    // 复合矩阵 http://staff.ustc.edu.cn/~lfdong/teach/2011cgbk/PPT/chp5.pdf
+    // 算了, 不用复合矩阵了...
+    this.matrix
+      .translate(x, y)
+      .scale(sx, sy)
+      .translate(-x, -y)
+    this.render()
+  }
+
+  protected render() {
+    const { targetElement, matrix } = this
+    const els = matrix.elements
+    const transformCss = `matrix(${els[0]},${els[1]},${els[3]},${els[4]},${els[6]},${els[7]})`
+    targetElement.style.transform = transformCss
   }
 
   // 其他方法
@@ -203,6 +233,14 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     }
   }
 
+  setRawRect(rect: DOMRect) {
+    this.rawRect = rect
+    this.rawCenter.set(
+      (rect.left + rect.right) / 2,
+      (rect.top + rect.bottom) / 2,
+    )
+  }
+
   /**
    * 为相关节点添加事件监听
    */
@@ -211,6 +249,10 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     this.triggerElement.addEventListener("wheel", this.onWheel)
     document.addEventListener("mousemove", this.onMouseMove)
     document.addEventListener("mouseup", this.onMouseUp)
+    this.addListener("move", this.onMove)
+    this.addListener("smoothMove", this.onMove)
+    this.addListener("scale", this.onScale)
+    this.addListener("smoothScale", this.onScale)
   }
 
   /**
@@ -221,5 +263,9 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     this.triggerElement.removeEventListener("wheel", this.onWheel)
     document.removeEventListener("mousemove", this.onMouseMove)
     document.removeEventListener("mouseup", this.onMouseUp)
+    this.removeListener("move", this.onMove)
+    this.removeListener("smoothMove", this.onMove)
+    this.removeListener("scale", this.onScale)
+    this.removeListener("smoothScale", this.onScale)
   }
 }
