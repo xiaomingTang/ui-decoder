@@ -127,7 +127,7 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
             center,
           })
         }
-        if (rotate && !Number.isNaN(rotate.angle) && rotate.angle !== 0 && center) {
+        if (rotate && center) {
           this.matrix
             .translate(-center.x, -center.y)
             .rotate(rotate.angle)
@@ -245,6 +245,14 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
     if (listen) {
       this.subscribe()
     }
+  }
+
+  setRawRect(rect: DOMRect) {
+    this.rawRect = rect
+    this.rawCenter.set(
+      (rect.left + rect.right) / 2,
+      (rect.top + rect.bottom) / 2,
+    )
   }
 
   /**

@@ -18,9 +18,12 @@ function App() {
 
   const onInit = useCallback((elem: HTMLDivElement | null) => {
     if (elem) {
+      const rect = elem.getBoundingClientRect()
       const tempMouseDecoder = new MouseDecoder(elem, elem, false)
+      tempMouseDecoder.setRawRect(rect)
       setMouseDecoder(tempMouseDecoder)
       const tempTouchDecoder = new TouchDecoder(elem, elem, false)
+      tempTouchDecoder.setRawRect(rect)
       setTouchDecoder(tempTouchDecoder)
     }
   }, [])
