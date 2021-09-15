@@ -13,9 +13,9 @@ export class Recorder {
   list: SimpleVectorWithTime[] = []
 
   /**
-   * list 长度限制在 20
+   * list 长度限制在 10
    */
-  limit = 5
+  limit = 10
 
   /**
    * 计算平均速度时, 仅计算 50ms 以内的位置

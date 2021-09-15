@@ -28,6 +28,7 @@ type DecoderEvent = {
   }];
 }
 
+type TouchEventHandler = (e: TouchEvent) => void
 type MouseEventHandler = (e: MouseEvent) => void
 type WheelHandler = (e: WheelEvent) => void
 
@@ -58,6 +59,8 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   protected isMouseDown = false
 
   protected smoothScaleFlag = -1
+
+  protected touchEventEnabled = false
 
   /**
    * 用户停止"甩动"节点后, 有一个"制动距离"
@@ -102,7 +105,14 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
 
   // 鼠标事件回调
 
+  protected onTouchStart: TouchEventHandler = (e) => {
+    this.touchEventEnabled = true
+  }
+
   protected onMouseDown: MouseEventHandler = (e) => {
+    if (this.touchEventEnabled) {
+      return
+    }
     if (e.button === 0) { // 左键被按下
       this.isMouseDown = true
       this.mouseMoveRecorder.pushFromMouseEvent(e)
@@ -110,6 +120,9 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   }
 
   protected onMouseMove: MouseEventHandler = (e) => {
+    if (this.touchEventEnabled) {
+      return
+    }
     if (this.isMouseDown) {
       this.mouseMoveRecorder.pushFromMouseEvent(e)
       this.emit("move", {
@@ -119,6 +132,9 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   }
 
   protected onMouseUp: MouseEventHandler = (e) => {
+    if (this.touchEventEnabled) {
+      return
+    }
     if (e.button === 0) { // 左键被释放
       this.isMouseDown = false
       this.smoothMove(
@@ -130,6 +146,9 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
   }
 
   protected onWheel: WheelHandler = (e) => {
+    if (this.touchEventEnabled) {
+      return
+    }
     // 滚轮事件触发之初, 立即停止之前没来得及调用的 smoothScale 方法
     window.cancelAnimationFrame(this.smoothScaleFlag)
     this.wheelRecorder.pushFromWheelEvent(e)
@@ -245,6 +264,7 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    * 为相关节点添加事件监听
    */
   subscribe() {
+    this.triggerElement.addEventListener("touchstart", this.onTouchStart)
     this.triggerElement.addEventListener("mousedown", this.onMouseDown)
     this.triggerElement.addEventListener("wheel", this.onWheel)
     document.addEventListener("mousemove", this.onMouseMove)
@@ -259,6 +279,7 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    * 移除相关节点的事件监听
    */
   unsubscribe() {
+    this.triggerElement.removeEventListener("touchstart", this.onTouchStart)
     this.triggerElement.removeEventListener("mousedown", this.onMouseDown)
     this.triggerElement.removeEventListener("wheel", this.onWheel)
     document.removeEventListener("mousemove", this.onMouseMove)

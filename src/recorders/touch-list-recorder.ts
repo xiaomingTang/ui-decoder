@@ -32,6 +32,14 @@ export class TouchListRecorder {
     oldTouchB: SimpleVectorWithTime,
     newTouchB: SimpleVectorWithTime,
   ) {
+    if (!(oldTouchA && newTouchA && oldTouchB && newTouchB)) {
+      return {
+        move: null,
+        scalar: null,
+        rotate: null,
+        center: null,
+      }
+    }
     const oldPositionA = new Vector2(oldTouchA.x, oldTouchA.y)
     const oldPositionB = new Vector2(oldTouchB.x, oldTouchB.y)
 
@@ -44,10 +52,12 @@ export class TouchListRecorder {
     const oldVector = new Vector2().subVectors(oldPositionB, oldPositionA)
     const newVector = new Vector2().subVectors(newPositionB, newPositionA)
 
-    const oldLength = oldVector.length()
-    const scaleVector = oldLength === 0
-      ? new Vector2()
-      : new Vector2().copy(oldVector).setLength(oldVector.dot(newVector) / oldLength)
+    const scalar = oldVector.length() === 0 ? 1 : newVector.length() / oldVector.length()
+
+    const multiLength = oldVector.length() * newVector.length()
+    const dot = newVector.dot(oldVector)
+    const cross = newVector.cross(oldVector)
+    const angle = multiLength === 0 ? 0 : Math.acos(dot / multiLength)
 
     const time = Math.max(newTouchA.time - oldTouchA.time, newTouchB.time - oldTouchB.time)
 
@@ -61,19 +71,31 @@ export class TouchListRecorder {
         time,
       },
       scalar: {
-        x: scaleVector.x,
-        y: scaleVector.y,
+        x: scalar,
+        y: scalar,
         time,
       },
-      rotate: {
-        center: {
-          x: newCenter.x,
-          y: newCenter.y,
-          time,
-        },
-        angle: 0.8,
+      rotate: Number.isNaN(angle) || angle === 0 ? null : {
+        angle: cross < 0 ? Math.PI * 2 - angle : angle,
+        time,
+      },
+      center: {
+        x: (oldCenter.x + newCenter.x) / 2,
+        y: (oldCenter.y + newCenter.y) / 2,
         time,
       },
     }
+  }
+
+  getLastDelta() {
+    const [recordA, recordB] = this.list
+    const lengthA = recordA?.list.length || 0
+    const lengthB = recordB?.list.length || 0
+    return this.getDelta(
+      recordA.list[lengthA - 2],
+      recordA.list[lengthA - 1],
+      recordB.list[lengthB - 2],
+      recordB.list[lengthB - 1],
+    )
   }
 }

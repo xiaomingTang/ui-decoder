@@ -12,12 +12,6 @@ function voidFunc() {
   // pass
 }
 
-function arrayToCssMatrix(arr: number[]) {
-  return [
-    arr[0], arr[1], arr[3], arr[4], arr[6], arr[7],
-  ]
-}
-
 function App() {
   const [mouseDecoder, setMouseDecoder] = useState<MouseDecoder>()
   const [touchDecoder, setTouchDecoder] = useState<TouchDecoder>()

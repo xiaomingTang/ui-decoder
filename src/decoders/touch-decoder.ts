@@ -55,6 +55,8 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
    */
   protected isTouching = false
 
+  protected touchAction = ""
+
   /**
    * 用户停止"甩动"节点后, 有一个"制动距离"
    *
@@ -90,6 +92,8 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
   // 鼠标事件回调
 
   protected onTouchStart: TouchEventHandler = (e) => {
+    e.preventDefault()
+    this.disableDefaultAction()
     this.isTouching = true
     this.touchListRecorder.updateListFromTouchList(e.touches)
   }
@@ -99,18 +103,46 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
    */
   protected onTouchMove: TouchEventHandler = (e) => {
     if (this.isTouching) {
-      this.touchListRecorder.updateListFromTouchList(e.changedTouches)
-      const delta = this.touchListRecorder.list[0]?.getLastDelta()
-      if (delta) {
-        this.emit("move", {
-          vector: delta,
-        })
+      if (e.touches.length === 1) {
+        this.touchListRecorder.updateListFromTouchList(e.touches)
+        const delta = this.touchListRecorder.list[0]?.getLastDelta()
+        if (delta) {
+          this.emit("move", {
+            vector: delta,
+          })
+        }
+      } else if (e.touches.length >= 2) {
+        this.touchListRecorder.updateListFromTouchList(e.touches)
+        const {
+          move, scalar, rotate, center,
+        } = this.touchListRecorder.getLastDelta()
+        if (move) {
+          this.emit("move", {
+            vector: move,
+          })
+        }
+        if (scalar && center) {
+          this.emit("scale", {
+            vector: scalar,
+            center,
+          })
+        }
+        if (rotate && !Number.isNaN(rotate.angle) && rotate.angle !== 0 && center) {
+          this.matrix
+            .translate(-center.x, -center.y)
+            .rotate(rotate.angle)
+            .translate(center.x, center.y)
+          this.render()
+        }
       }
     }
   }
 
   protected onTouchEnd: TouchEventHandler = (e) => {
-    this.isTouching = false
+    if (e.touches.length === 0) {
+      this.isTouching = false
+      this.restoreDefaultAction()
+    }
     const speed = this.touchListRecorder.list[0]?.getAvgSpeed()
     if (speed) {
       this.smoothMove(
@@ -122,6 +154,15 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
   }
 
   // 默认监听
+
+  protected disableDefaultAction() {
+    this.touchAction = document.documentElement.style.touchAction
+    document.documentElement.style.touchAction = "none"
+  }
+
+  protected restoreDefaultAction() {
+    document.documentElement.style.touchAction = this.touchAction
+  }
 
   onMove = (...[{ vector }]: DecoderEvent["move"]) => {
     this.matrix.translate(vector.x, vector.y)
@@ -213,6 +254,7 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
     this.triggerElement.addEventListener("touchstart", this.onTouchStart)
     document.addEventListener("touchmove", this.onTouchMove)
     document.addEventListener("touchend", this.onTouchEnd)
+    document.addEventListener("touchcancel", this.onTouchEnd)
     this.addListener("move", this.onMove)
     this.addListener("smoothMove", this.onMove)
     this.addListener("scale", this.onScale)
@@ -226,6 +268,7 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
     this.triggerElement.removeEventListener("touchstart", this.onTouchStart)
     document.removeEventListener("touchmove", this.onTouchMove)
     document.removeEventListener("touchend", this.onTouchEnd)
+    document.removeEventListener("touchcancel", this.onTouchEnd)
     this.removeListener("move", this.onMove)
     this.removeListener("smoothMove", this.onMove)
     this.removeListener("scale", this.onScale)
