@@ -1,7 +1,7 @@
 import EventEmitter from "eventemitter3";
 import { Matrix3, Vector2 } from "three";
 import { SimpleVectorWithTime } from "@Src/recorders/recorder";
-import { MouseRecorder } from "@Src/recorders/mouse-recorder";
+import { TouchListRecorder } from "@Src/recorders/touch-list-recorder";
 declare type DecoderEvent = {
     move: [{
         vector: SimpleVectorWithTime;
@@ -23,11 +23,13 @@ declare type DecoderEvent = {
         vector: SimpleVectorWithTime;
         center: SimpleVectorWithTime;
     }];
+    rotate: [{
+        angle: number;
+        center: SimpleVectorWithTime;
+    }];
 };
 declare type TouchEventHandler = (e: TouchEvent) => void;
-declare type MouseEventHandler = (e: MouseEvent) => void;
-declare type WheelHandler = (e: WheelEvent) => void;
-export declare class MouseDecoder extends EventEmitter<DecoderEvent> {
+export declare class TouchDecoder extends EventEmitter<DecoderEvent> {
     /**
      * 监听的元素
      */
@@ -39,14 +41,12 @@ export declare class MouseDecoder extends EventEmitter<DecoderEvent> {
     protected rawRect: DOMRect;
     protected rawCenter: Vector2;
     protected matrix: Matrix3;
-    protected mouseMoveRecorder: MouseRecorder;
-    protected wheelRecorder: MouseRecorder;
+    protected touchListRecorder: TouchListRecorder;
     /**
      * 鼠标是否按下
      */
-    protected isMouseDown: boolean;
-    protected smoothScaleFlag: number;
-    protected touchEventEnabled: boolean;
+    protected isTouching: boolean;
+    protected touchAction: string;
     /**
      * 用户停止"甩动"节点后, 有一个"制动距离"
      *
@@ -64,17 +64,9 @@ export declare class MouseDecoder extends EventEmitter<DecoderEvent> {
      */
     SMOOTH_MOVE_LIMIT_RUN_TIMES: number;
     /**
-     * 鼠标缩放比拖拽更加离散(通常滚动一次滚轮, 需要提供较大的缩放)
-     *
-     * 所以缩放事件拥有一个开关, 在滚轮事件触发伊始, 要么触发 scale, 要么触发 smoothScale, 二选一
-     *
-     * 而非像拖动事件那样, 拖动时触发 move, 拖动结束后触发 smoothMove
-     */
-    ENABLE_SMOOTH_SCALE: boolean;
-    /**
      * 用户滚动一次滚轮时, 缩放的倍数
      */
-    SCALE_RATIO: number;
+    SMOOTH_SCALE_RATIO: number;
     /**
      * 用户停止滚动滚轮后"smoothScale 制动函数"被调用的次数
      *
@@ -84,10 +76,13 @@ export declare class MouseDecoder extends EventEmitter<DecoderEvent> {
      */
     SMOOTH_SCALE_LIMIT_RUN_TIMES: number;
     protected onTouchStart: TouchEventHandler;
-    protected onMouseDown: MouseEventHandler;
-    protected onMouseMove: MouseEventHandler;
-    protected onMouseUp: MouseEventHandler;
-    protected onWheel: WheelHandler;
+    /**
+     * @TODO: 多指(> 3)滑动一段时间后 touchmove 触发频率显著降低, 应该是需要 preventDefault, 有待加上
+     */
+    protected onTouchMove: TouchEventHandler;
+    protected onTouchEnd: TouchEventHandler;
+    protected disableDefaultAction(): void;
+    protected restoreDefaultAction(): void;
     onMove: (__0_0: {
         vector: SimpleVectorWithTime;
     }) => void;
@@ -96,6 +91,10 @@ export declare class MouseDecoder extends EventEmitter<DecoderEvent> {
          * vector.y 表示滚轮滚动了 y 次(y > 0 表示向下滚, y < 0 表示向上滚)
          */
         vector: SimpleVectorWithTime;
+        center: SimpleVectorWithTime;
+    }) => void;
+    onRotate: (__0_0: {
+        angle: number;
         center: SimpleVectorWithTime;
     }) => void;
     protected render(): void;
