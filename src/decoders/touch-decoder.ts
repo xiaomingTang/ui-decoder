@@ -26,7 +26,10 @@ type DecoderEvent = {
     vector: SimpleVectorWithTime;
     center: SimpleVectorWithTime;
   }];
-  random: [number];
+  rotate: [{
+    angle: number;
+    center: SimpleVectorWithTime;
+  }];
 }
 
 type TouchEventHandler = (e: TouchEvent) => void
@@ -128,11 +131,10 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
           })
         }
         if (rotate && center) {
-          this.matrix
-            .translate(-center.x, -center.y)
-            .rotate(rotate.angle)
-            .translate(center.x, center.y)
-          this.render()
+          this.emit("rotate", {
+            angle: rotate.angle,
+            center,
+          })
         }
       }
     }
@@ -179,6 +181,18 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
     this.matrix
       .translate(x, y)
       .scale(sx, sy)
+      .translate(-x, -y)
+    this.render()
+  }
+
+  onRotate = (...[{ angle, center }]: DecoderEvent["rotate"]) => {
+    const x = this.rawCenter.x - center.x
+    const y = this.rawCenter.y - center.y
+    // 复合矩阵 http://staff.ustc.edu.cn/~lfdong/teach/2011cgbk/PPT/chp5.pdf
+    // 算了, 不用复合矩阵了...
+    this.matrix
+      .translate(x, y)
+      .rotate(angle)
       .translate(-x, -y)
     this.render()
   }
@@ -267,6 +281,7 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
     this.addListener("smoothMove", this.onMove)
     this.addListener("scale", this.onScale)
     this.addListener("smoothScale", this.onScale)
+    this.addListener("rotate", this.onRotate)
   }
 
   /**
@@ -281,5 +296,6 @@ export class TouchDecoder extends EventEmitter<DecoderEvent> {
     this.removeListener("smoothMove", this.onMove)
     this.removeListener("scale", this.onScale)
     this.removeListener("smoothScale", this.onScale)
+    this.removeListener("rotate", this.onRotate)
   }
 }
