@@ -19,13 +19,16 @@ function App() {
   const onInit = useCallback((elem: HTMLDivElement | null) => {
     if (elem) {
       const rect = elem.getBoundingClientRect()
+      const boundaryRect = document.body.getBoundingClientRect()
 
       const tempMouseDecoder = new MouseDecoder(elem, elem, false)
       tempMouseDecoder.setRawRect(rect)
+      tempMouseDecoder.setBoundaryRect(boundaryRect)
       setMouseDecoder(tempMouseDecoder)
 
       const tempTouchDecoder = new TouchDecoder(elem, elem, false)
       tempTouchDecoder.setRawRect(rect)
+      // tempTouchDecoder.setBoundaryRect(boundaryRect)
       setTouchDecoder(tempTouchDecoder)
     }
   }, [])

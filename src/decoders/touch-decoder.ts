@@ -3,7 +3,7 @@ import EventEmitter from "eventemitter3"
 import { Matrix3, Vector2 } from "three"
 import { SimpleVectorWithTime } from "@Src/recorders/recorder"
 import { TouchListRecorder } from "@Src/recorders/touch-list-recorder"
-import { sumSmoothScaleMagicValue } from "@Src/utils/smooth-scale-magic-value"
+import { sumSmoothScaleMagicValue } from "@Src/utils"
 
 type DecoderEvent = {
   move: [{

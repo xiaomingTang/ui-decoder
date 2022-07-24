@@ -3,7 +3,7 @@ import EventEmitter from "eventemitter3"
 import { Matrix3, Vector2 } from "three"
 import { SimpleVectorWithTime } from "@Src/recorders/recorder"
 import { MouseRecorder } from "@Src/recorders/mouse-recorder"
-import { sumSmoothScaleMagicValue } from "@Src/utils/smooth-scale-magic-value"
+import { matrix3MultiplyRect, sumSmoothScaleMagicValue } from "@Src/utils"
 
 type DecoderEvent = {
   move: [{
@@ -26,6 +26,7 @@ type DecoderEvent = {
     vector: SimpleVectorWithTime;
     center: SimpleVectorWithTime;
   }];
+  changeEnd: [];
 }
 
 type TouchEventHandler = (e: TouchEvent) => void
@@ -42,6 +43,8 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    * 控制的元素
    */
   targetElement: HTMLElement
+
+  protected boundaryRect: DOMRect = new DOMRect()
 
   protected rawRect: DOMRect = new DOMRect()
 
@@ -105,7 +108,7 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
 
   // 鼠标事件回调
 
-  protected onTouchStart: TouchEventHandler = (e) => {
+  protected onTouchStart: TouchEventHandler = () => {
     this.touchEventEnabled = true
   }
 
@@ -188,6 +191,46 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     this.render()
   }
 
+  onChangeEnd = () => {
+    /**
+     * 需要添加参数, 由用户(调用者)决定是否需要限制在 rect 内
+     */
+    const {
+      boundaryRect, rawCenter, rawRect, matrix,
+    } = this
+    let curRect = matrix3MultiplyRect(matrix, rawRect)
+    const curCenter = new Vector2(
+      (curRect.left + curRect.right) / 2,
+      (curRect.top + curRect.bottom) / 2,
+    )
+    const scalar = Math.min(boundaryRect.width / curRect.width, boundaryRect.height / curRect.height)
+    if (scalar < 1) {
+      matrix
+        .translate(rawCenter.x - curCenter.x, rawCenter.y - curCenter.y)
+        .scale(scalar, scalar)
+        .translate(-(rawCenter.x - curCenter.x), -(rawCenter.y - curCenter.y))
+      curRect = matrix3MultiplyRect(matrix, rawRect)
+    }
+    const move = {
+      x: 0,
+      y: 0,
+    }
+    if (curRect.right > boundaryRect.right) {
+      move.x = boundaryRect.right - curRect.right
+    } else if (curRect.left < boundaryRect.left) {
+      move.x = boundaryRect.left - curRect.left
+    }
+    if (curRect.bottom > boundaryRect.bottom) {
+      move.y = boundaryRect.bottom - curRect.bottom
+    } else if (curRect.top < boundaryRect.top) {
+      move.y = boundaryRect.top - curRect.top
+    }
+    if (move.x !== 0 || move.y !== 0) {
+      this.matrix.translate(move.x, move.y)
+    }
+    this.render()
+  }
+
   protected render() {
     const { targetElement, matrix } = this
     const els = matrix.elements
@@ -199,6 +242,9 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
 
   protected smoothMove(speed: SimpleVectorWithTime, ratio: number, RUN_TIMES = 0) {
     if (this.isMouseDown || RUN_TIMES >= this.SMOOTH_MOVE_LIMIT_RUN_TIMES) {
+      window.requestAnimationFrame(() => {
+        this.emit("changeEnd")
+      })
       return
     }
     const vector: SimpleVectorWithTime = {
@@ -224,6 +270,9 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
    */
   protected smoothScale(speed: SimpleVectorWithTime, center: SimpleVectorWithTime, MAGIC_TIMES = 10) {
     if (MAGIC_TIMES >= this.SMOOTH_SCALE_LIMIT_RUN_TIMES + 10) {
+      window.requestAnimationFrame(() => {
+        this.emit("changeEnd")
+      })
       return
     }
     const MAGIC_SUM = sumSmoothScaleMagicValue(10, this.SMOOTH_SCALE_LIMIT_RUN_TIMES + 10 - 1)
@@ -260,6 +309,10 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     )
   }
 
+  setBoundaryRect(rect: DOMRect) {
+    this.boundaryRect = rect
+  }
+
   /**
    * 为相关节点添加事件监听
    */
@@ -273,6 +326,7 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     this.addListener("smoothMove", this.onMove)
     this.addListener("scale", this.onScale)
     this.addListener("smoothScale", this.onScale)
+    this.addListener("changeEnd", this.onChangeEnd)
   }
 
   /**
@@ -288,5 +342,6 @@ export class MouseDecoder extends EventEmitter<DecoderEvent> {
     this.removeListener("smoothMove", this.onMove)
     this.removeListener("scale", this.onScale)
     this.removeListener("smoothScale", this.onScale)
+    this.removeListener("changeEnd", this.onChangeEnd)
   }
 }

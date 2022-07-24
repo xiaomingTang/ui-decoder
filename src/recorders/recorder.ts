@@ -13,12 +13,14 @@ export class Recorder {
   list: SimpleVectorWithTime[] = []
 
   /**
-   * list 长度限制在 10
+   * list 长度限制
+   * @default 10
    */
   limit = 10
 
   /**
-   * 计算平均速度时, 仅计算 50ms 以内的位置
+   * 计算平均速度时, 仅计算 timeLimit(ms) 以内的位置
+   * @default 50
    */
   timeLimit = 50
 
@@ -98,8 +100,8 @@ export class Recorder {
   getLastDelta(): SimpleVectorWithTime {
     const len = this.list.length
     const lastElem = this.list[len - 1]
-    const lastButTwoElem = this.list[len - 2]
-    return this.getDelta(lastButTwoElem, lastElem)
+    const secondLastElem = this.list[len - 2]
+    return this.getDelta(secondLastElem, lastElem)
   }
 
   /**
